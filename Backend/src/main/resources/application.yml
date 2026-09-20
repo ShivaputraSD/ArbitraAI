@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+app:
+  openai:
+    api-key: "${OPENAI_API_KEY}"
+    model: "gpt-4o-mini"
+  tavly:
+    api-key: "${TAVLY_API_KEY}"
+    max-results: 3
+  research:
+    default-max-iterations: 3

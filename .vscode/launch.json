@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "type": "java",
+        "name": "ArbitraAiApplication",
+        "request": "launch",
+        "mainClass": "Shivu.ArbitraAI.ArbitraAiApplication",
+        "projectName": "ArbitraAI",
+        "env": {
+            "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+            "TAVLY_API_KEY": "${env:TAVLY_API_KEY}",
+        }
+    },
+    {
+        "type": "java",
+        "name": "Run DeepResearchApplication",
+        "request": "launch",
+        "mainClass": "com.example.research.DeepResearchApplication",
+        "env": {
+            "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
+            "TAVLY_API_KEY": "${env:TAVLY_API_KEY}",
+            "SERVER_PORT": "8080"
+        }
+    }
+]
+}

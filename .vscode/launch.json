@@ -6,10 +6,17 @@
         "name": "ArbitraAiApplication",
         "request": "launch",
         "mainClass": "Shivu.ArbitraAI.ArbitraAiApplication",
+        "projectName": "deep-research-api"
+    },
+    {
+        "type": "java",
+        "name": "ArbitraAiApplication",
+        "request": "launch",
+        "mainClass": "Shivu.ArbitraAI.ArbitraAiApplication",
         "projectName": "ArbitraAI",
         "env": {
             "OPENAI_API_KEY": "${env:OPENAI_API_KEY}",
-            "TAVLY_API_KEY": "${env:TAVLY_API_KEY}",
+            "TAVLY_API_KEY": "${env:TAVLY_API_KEY}"
         }
     },
     {

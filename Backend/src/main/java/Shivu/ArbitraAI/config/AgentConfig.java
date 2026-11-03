@@ -19,8 +19,8 @@ public class AgentConfig {
                 .baseUrl("https://api.groq.com/openai/v1")
                 .apiKey(openAiApiKey)
                 .modelName("openai/gpt-oss-20b")
-                .temperature(0.1)
-                .timeout(Duration.ofSeconds(90))
+                .maxTokens(4096)
+                .temperature(0.3)
                 .build();
     }
 }

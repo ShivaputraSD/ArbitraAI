@@ -1,12 +1,15 @@
 package Shivu.ArbitraAI.service;
 
+import Shivu.ArbitraAI.dto.ResearchMode;
 import Shivu.ArbitraAI.dto.ResearchResponse;
+import Shivu.ArbitraAI.dto.SearchResult;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import org.springframework.stereotype.Service;
 
 import java.time.Year;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Service
 public class DeepResearchService {
@@ -19,151 +22,160 @@ public class DeepResearchService {
         this.searchService = searchService;
     }
 
-    public ResearchResponse runResearch(String userQuery, int maxIterations) {
+    public ResearchResponse runResearch(String userQuery, ResearchMode mode, int maxIterations, Consumer<String> progressCallback) {
+        if (progressCallback == null) progressCallback = log -> {}; // Default no-op callback
+
+        return switch (mode) {
+            case NORMAL -> runNormalAnswer(userQuery, progressCallback);
+            case SMALL  -> runSmallResearch(userQuery, progressCallback);
+            case DEEP   -> runDeepResearch(userQuery, maxIterations, progressCallback);
+        };
+    }
+
+    private ResearchResponse runNormalAnswer(String userQuery, Consumer<String> progress) {
+        progress.accept("Analyzing query directly without web search...");
+        String prompt = String.format("""
+            You are a concise technical assistant. Answer the user's question directly.
+            
+            STRICT CONSTRAINTS:
+            - Word count: Maximum 100 words (2 to 3 concise sentences max).
+            - Direct answer only. No tables, code blocks, or lists.
+            
+            Question: "%s"
+            """, userQuery);
+
+        String answer = chatModel.generate(prompt);
+        return new ResearchResponse(userQuery, "Direct Knowledge Response", List.of("Mode: NORMAL"), 0, answer);
+    }
+
+    private ResearchResponse runSmallResearch(String userQuery, Consumer<String> progress) {
+        int currentYear = Year.now().getValue();
+        String searchQuery = userQuery + " " + currentYear;
+
+        progress.accept("Executing Tavly web search query: " + searchQuery);
+        List<SearchResult> searchResults = searchService.searchDetailed(searchQuery);
+
+        progress.accept("Synthesizing 200-300 word summary from " + searchResults.size() + " web sources...");
+        String rawText = searchResults.stream()
+                .map(r -> "Title: " + r.title() + "\nURL: " + r.url() + "\nContent: " + r.content())
+                .collect(Collectors.joining("\n\n"));
+
+        String synthesisPrompt = String.format("""
+            You are an efficient research assistant in %d. Synthesize a clean summary.
+            
+            STRICT CONSTRAINTS:
+            - Target word count: 200 to 300 words.
+            - Include 3 to 4 concise bullet points highlighting key metrics or takeaways.
+            
+            Question: "%s"
+            
+            SEARCH RESULTS:
+            %s
+            """, currentYear, userQuery, rawText);
+
+        String answer = chatModel.generate(synthesisPrompt);
+        String finalReportWithSources = answer + "\n\n" + formatSourcesMarkdown(searchResults);
+
+        return new ResearchResponse(userQuery, "Single-Pass Search: " + searchQuery, List.of("Mode: SMALL"), 1, finalReportWithSources);
+    }
+
+    private ResearchResponse runDeepResearch(String userQuery, int maxIterations, Consumer<String> progress) {
         int currentYear = Year.now().getValue();
 
-        System.out.println("==================================================");
-        System.out.println(">>> Starting Deep Research Loop for: " + userQuery);
-        System.out.println(">>> Current Year Context: " + currentYear);
-        System.out.println("==================================================");
-
-        // Step 1: Generate Research Strategy & Search Queries anchored to current year
+        // 1. Generate Research Strategy
+        progress.accept("Formulating iterative research plan for: " + userQuery);
         String planPrompt = String.format("""
-            You are an expert lead researcher in %d. Create a structured research strategy for the query:
-            "%s"
-
-            Provide exactly %d distinct, highly targeted web search queries focusing on current developments up to %d.
-            Ensure queries use terms like "%d developments", "latest benchmarks", or "production best practices".
-            List each search query on a new line as a clean bullet point starting with a dash (-).
-            """, currentYear, userQuery, maxIterations, currentYear, currentYear);
+            You are an expert lead researcher in %d. Create a structured research strategy for: "%s"
+            Provide exactly %d distinct web search queries. List each starting with a dash (-).
+            """, currentYear, userQuery, maxIterations);
 
         String researchPlan = chatModel.generate(planPrompt);
-        System.out.println(">>> RESEARCH PLAN GENERATED:\n" + researchPlan);
-
         List<String> searchQueries = parsePlanQueries(researchPlan, userQuery, maxIterations);
 
-        // Step 2: Iterative Search & Synthesis Loop
+        // 2. Iterative Search & Deduplication
         List<String> iterationFindings = new ArrayList<>();
         StringBuilder accumulatedContext = new StringBuilder();
+        Map<String, String> uniqueSources = new LinkedHashMap<>();
 
         for (int i = 0; i < searchQueries.size(); i++) {
             String currentSearchQuery = searchQueries.get(i);
-            int iterationNum = i + 1;
+            progress.accept(String.format("Pass %d/%d: Searching web for '%s'...", (i + 1), searchQueries.size(), currentSearchQuery));
 
-            System.out.println("\n--------------------------------------------------");
-            System.out.println(">>> Iteration " + iterationNum + "/" + searchQueries.size() + " - Search Query: " + currentSearchQuery);
-            System.out.println("--------------------------------------------------");
-
-            // Fetch live web results
-            String rawSearchResults = searchService.search(currentSearchQuery);
-
-            // Terminal Debug Print: Check what Tavly returned
-            System.out.println(">>> RAW SEARCH RESULTS SNIPPET:");
-            if (rawSearchResults != null && !rawSearchResults.isBlank()) {
-                int previewLength = Math.min(300, rawSearchResults.length());
-                System.out.println(rawSearchResults.substring(0, previewLength) + "...\n");
-            } else {
-                System.out.println("[WARNING] Search results came back empty or null!\n");
-                rawSearchResults = "No web search results could be retrieved for query: " + currentSearchQuery;
+            List<SearchResult> results = searchService.searchDetailed(currentSearchQuery);
+            for (SearchResult res : results) {
+                uniqueSources.putIfAbsent(res.url(), res.title());
             }
 
-            // Analyze search context with LLM
+            progress.accept(String.format("Pass %d/%d: Extracting insights from %d sources...", (i + 1), searchQueries.size(), results.size()));
+            String searchContext = results.stream()
+                    .map(r -> "Source: " + r.title() + " (" + r.url() + ")\n" + r.content())
+                    .collect(Collectors.joining("\n---\n"));
+
             String extractionPrompt = String.format("""
-                You are a senior research analyst. Extract concrete facts, metrics, framework names, benchmarks, and technical insights from the web search results provided below.
-
-                Original Goal: "%s"
-                Sub-Query Target: "%s"
-
-                RAW WEB SEARCH RESULTS:
+                Extract facts, metrics, and insights from the web search results below.
+                
+                Goal: "%s"
+                Sub-Query: "%s"
+                
+                SEARCH RESULTS:
                 %s
-
-                Instructions:
-                1. Pull out specific names, versions, metrics, benchmarks, pros/cons, and real-world examples present in the text.
-                2. Do NOT output empty dashes (-) or generic placeholders. If the search results contain information, synthesize it thoroughly into detailed bullet points.
-                3. If the search results are missing data, explicitly state what search terms failed and extract whatever relevant context exists.
-                """, userQuery, currentSearchQuery, rawSearchResults);
+                """, userQuery, currentSearchQuery, searchContext);
 
             String finding = chatModel.generate(extractionPrompt);
-
-            System.out.println(">>> SYNTHESIZED FINDINGS FOR ITERATION " + iterationNum + ":\n" + finding);
-
-            String structuredFinding = "Iteration " + iterationNum + " [" + currentSearchQuery + "]:\n" + finding;
-            iterationFindings.add(structuredFinding);
-
-            accumulatedContext.append("\n\n--- RESEARCH FINDINGS STEP ").append(iterationNum)
-                              .append(" (Query: ").append(currentSearchQuery).append(") ---\n")
-                              .append(finding);
+            iterationFindings.add("Iteration " + (i + 1) + " [" + currentSearchQuery + "]:\n" + finding);
+            accumulatedContext.append("\n\n--- FINDINGS STEP ").append(i + 1).append(" ---\n").append(finding);
         }
 
-        // Step 3: Final Report Synthesis
-        System.out.println("\n==================================================");
-        System.out.println(">>> Generating Final Deep Research Synthesis Report...");
-        System.out.println("==================================================");
-
+        // 3. Final Report Synthesis
+        progress.accept("Synthesizing 500+ word final deep research report...");
         String finalReportPrompt = String.format("""
-            You are a Principal AI Architect writing a comprehensive Deep Research Report in %d.
+            You are a Principal AI Architect writing a Deep Research Report in %d.
 
             Original Query: "%s"
 
-            Synthesize a cohesive, publication-ready research report based on the collected research findings below:
+            STRICT CONSTRAINTS:
+            - Minimum word count: 500+ words.
+            - Include Executive Summary, Comparative Markdown Table, Detailed Analysis, and Production Guidelines.
+            - Ensure all sections finish cleanly without truncation.
 
             COLLECTED RESEARCH DATA:
             %s
-
-            Report Structure Requirements:
-            # Deep Research Report: %s (%d Edition)
-
-            ## 1. Executive Summary
-            - Key takeaways, current state, and strategic outlook.
-            - Include a summary Markdown Table highlighting core facets or metrics.
-
-            ## 2. Comprehensive Findings & Technical Breakdown
-            - Detailed examination of frameworks, tools, methodologies, or benchmarks discovered.
-            - Use clear bullet points, code concepts, or architectural notes where applicable.
-
-            ## 3. Comparative Analysis & Trade-offs
-            - Strengths vs. Weaknesses, production readiness, scalability, or cost factors.
-
-            ## 4. Key Recommendations & Future Outlook
-            - Actionable next steps and guidance for technical decision-makers in %d.
-            """, currentYear, userQuery, accumulatedContext.toString(), userQuery, currentYear, currentYear);
+            """, currentYear, userQuery, accumulatedContext.toString());
 
         String finalReport = chatModel.generate(finalReportPrompt);
 
-        return new ResearchResponse(
-            userQuery,
-            researchPlan,
-            iterationFindings,
-            iterationFindings.size(),
-            finalReport
-        );
+        List<SearchResult> deduplicatedSources = uniqueSources.entrySet().stream()
+                .map(entry -> new SearchResult(entry.getValue(), entry.getKey(), ""))
+                .toList();
+
+        String finalReportWithSources = finalReport + "\n\n" + formatSourcesMarkdown(deduplicatedSources);
+        progress.accept("Deep research completed successfully!");
+
+        return new ResearchResponse(userQuery, researchPlan, iterationFindings, iterationFindings.size(), finalReportWithSources);
+    }
+
+    private String formatSourcesMarkdown(List<SearchResult> sources) {
+        if (sources.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder("### Sources & References\n");
+        int index = 1;
+        for (SearchResult source : sources) {
+            sb.append(String.format("%d. [%s](%s)\n", index++, source.title(), source.url()));
+        }
+        return sb.toString();
     }
 
     private List<String> parsePlanQueries(String planText, String fallbackQuery, int maxIterations) {
         List<String> queries = new ArrayList<>();
-        if (planText == null || planText.isBlank()) {
-            queries.add(fallbackQuery);
-            return queries;
-        }
+        if (planText == null || planText.isBlank()) return List.of(fallbackQuery);
 
-        String[] lines = planText.split("\n");
-
-        for (String line : lines) {
+        for (String line : planText.split("\n")) {
             String trimmed = line.trim();
             if (trimmed.startsWith("-") || trimmed.startsWith("*") || trimmed.matches("^\\d+\\..*")) {
-                String cleaned = trimmed.replaceFirst("^[-*\\d+\\.]\\s*", "")
-                                        .replaceAll("\"|'", "")
-                                        .trim();
-                if (!cleaned.isBlank()) {
-                    queries.add(cleaned);
-                }
+                String cleaned = trimmed.replaceFirst("^[-*\\d+\\.]\\s*", "").replaceAll("\"|'", "").trim();
+                if (!cleaned.isBlank()) queries.add(cleaned);
             }
         }
-
-        if (queries.isEmpty()) {
-            queries.add(fallbackQuery);
-        }
-
+        if (queries.isEmpty()) queries.add(fallbackQuery);
         return queries.subList(0, Math.min(queries.size(), maxIterations));
     }
 }

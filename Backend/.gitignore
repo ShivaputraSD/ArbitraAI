@@ -34,3 +34,5 @@ build/
 .launch.json/
 .application.yml/
 .idea/
+.vscode\launch.json
+.vscode\settings.json

@@ -3,10 +3,11 @@ server:
 
 app:
   openai:
-    api-key: "${OPENAI_API_KEY}"
+    api-key: "Your_API_key"
     model: "gpt-4o-mini"
   tavly:
-    api-key: "${TAVLY_API_KEY}"
+    api:
+    key: "Your_API_key"
     max-results: 3
   research:
     default-max-iterations: 3

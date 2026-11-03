@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Research Agent Dashboard</title>
+  
+  <!-- Typography & Layout CSS -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Markdown Parser (Marked.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Code Syntax Highlighting (Highlight.js) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+  <div class="dashboard-container">
+    
+    <!-- Sidebar / Control Panel -->
+    <aside class="control-panel">
+      <h2>Research Agent</h2>
+      <form id="research-form">
+        <div class="form-group">
+          <label for="topic">Research Topic</label>
+          <input type="text" id="topic" placeholder="e.g., Scalable Rate Limiting in Distributed Systems" required />
+        </div>
+        
+
+        <div class="form-group">
+          <label for="mode">Research Mode</label>
+          <select id="mode">
+            <option value="NORMAL">Quick Summary</option>
+            <option value="SMALL" selected>Standard Deep Dive</option>
+            <option value="DEEP">Exhaustive Technical Analysis</option>
+          </select>
+        </div>
+
+        <button type="submit" id="submit-btn">
+          <span class="btn-text">Generate Report</span>
+          <span class="spinner hidden"></span>
+        </button>
+
+        <div class="history-section">
+          <h3>Recent Research</h3>
+          <ul id="history-list" class="history-list">
+            <li class="history-placeholder">No past research yet</li>
+          </ul>
+        </div>
+      </form>
+    </aside>
+
+    <!-- Main Output View -->
+    <main class="report-viewport">
+      <header class="report-header">
+        <h1 id="report-title">Research Workspace</h1>
+        <div class="actions">
+          <button id="copy-btn" class="secondary-btn" disabled>Copy Markdown</button>
+        </div>
+      </header>
+
+      <div id="output-container" class="markdown-body">
+        <p class="placeholder-text">Submit a research prompt on the left to start generating an actionable report.</p>
+      </div>
+    </main>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

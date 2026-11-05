@@ -119,7 +119,7 @@ ArbitraAI/
 
 **1. Clone the Repository**
 ```text
-
+https://github.com/ShivaputraSD/ArbitraAI.git
 ```
 **2. Configure Environment Variables**
 
@@ -160,7 +160,7 @@ mvn spring-boot:run
 
 Open your browser and navigate to:
 
-``text
+```text
 http://localhost:8080
 ```
 

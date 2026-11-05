@@ -62,10 +62,105 @@
                +-------------------------------------------------------+
                |  Spring Data JPA Repository  -->  H2 In-Memory DB     |
                +-------------------------------------------------------+
+
+```
+## 📁 Repository Structure
+
+```text
+
+ArbitraAI/
+├── src/
+│   ├── main/
+│   │   ├── java/Shivu/ArbitraAI/
+│   │   │   ├── config/
+│   │   │   │   └── AgentConfig.java
+│   │   │   ├── controller/
+│   │   │   │   └── ResearchController.java
+│   │   │   ├── dto/
+│   │   │   │   ├── ResearchMode.java
+│   │   │   │   ├── ResearchRequest.java
+│   │   │   │   ├── ResearchResponse.java
+│   │   │   │   └── SearchResult.java
+│   │   │   ├── model/
+│   │   │   │   └── ResearchState.java
+│   │   │   ├── repository/
+│   │   │   │   └── ResearchReportRepository.java
+│   │   │   ├── service/
+│   │   │   │   ├── DeepResearchService.java
+│   │   │   │   └── TavlySearchService.java
+│   │   │   └── ArbitraAiApplication.java
+│   │   └── resources/
+│   │       ├── application.yml
+│   │       └── static/
+│   │           ├── index.html
+│   │           ├── style.css
+│   │           └── app.js
+│   └── test/
+└── pom.xml
+
 ```
 
+## 🛠️ Tech Stack
 
-ArbitraAI/Backend
-|--src/
-|  |--Frontend
-|  |  |--app.js
+* **Language:** Java 21
+* **Framework:** Spring Boot 3.x
+* **AI & Orchestration:** LangChain4j, Tavily Search API
+* **Database & Persistence:** Spring Data JPA, H2 Database
+* **Concurrency & Communication:** Java CompletableFuture, Server-Sent Events (SSE), RESTful APIs
+* **Frontend:** HTML5, Modern CSS3, Vanilla JavaScript, Marked.js
+
+
+## 🚀 Getting Started
+
+**Prerequisites**
+* **JDK 21** or higher installed
+* **Maven 3.8+** installed
+* **Tavily API Key and OpenAI/Gemini API Key**
+
+**1. Clone the Repository**
+```text
+
+```
+**2. Configure Environment Variables**
+
+Create or Update application.yml with your configuration and API keys:
+
+```text
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:arbitradb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: true
+
+api:
+  tavily:
+    key: ${TAVILY_API_KEY}
+  llm:
+    key: ${LLM_API_KEY}
+```
+
+**3.Build & Run**
+
+```text
+# Build the project
+mvn clean package
+
+# Run the application
+mvn spring-boot:run
+```
+
+**4.Access the Platform**
+
+Open your browser and navigate to:
+
+``text
+http://localhost:8080
+```
+
